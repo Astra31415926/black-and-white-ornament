@@ -1,59 +1,522 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>QR Scanner App</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  
-  <!-- Подключаем стили -->
-  <link rel="stylesheet" href="css/style.css">
-  
-  <!-- Подключаем библиотеку jsQR (для распознавания QR-кодов) -->
-  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pattern Snowflake Generator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Space+Grotesk:wght@300;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0a0a0a;
+            --fg: #e8e8e8;
+            --muted: #5a5a5a;
+            --accent: #00ff88;
+            --accent-dim: #00cc6a;
+            --card: #151515;
+            --border: #252525;
+            --hover: #1e1e1e;
+        }
+        
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        body {
+            font-family: 'Space Grotesk', sans-serif;
+            background: var(--bg);
+            color: var(--fg);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        
+        .mono { font-family: 'JetBrains Mono', monospace; }
+        
+        .bg-pattern {
+            position: fixed; inset: 0;
+            background-image: 
+                radial-gradient(circle at 50% 0%, rgba(0, 255, 136, 0.03) 0%, transparent 50%),
+                radial-gradient(circle at 1px 1px, var(--border) 1px, transparent 1px);
+            background-size: 100% 100%, 32px 32px;
+            pointer-events: none; z-index: 0;
+        }
+        
+        .canvas-wrapper {
+            position: relative; background: #ffffff; border-radius: 4px;
+            box-shadow: 0 0 0 1px var(--border), 0 20px 60px -10px rgba(0, 0, 0, 0.5);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        .canvas-wrapper:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 0 0 1px var(--accent), 0 25px 70px -10px rgba(0, 0, 0, 0.6);
+        }
+        
+        #snowflakeCanvas { display: block; border-radius: 4px; }
+        
+        .control-panel {
+            background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+            padding: 20px; margin-bottom: 16px; transition: border-color 0.3s ease;
+        }
+        
+        .control-group { margin-bottom: 16px; }
+        .control-group:last-child { margin-bottom: 0; }
+        
+        .control-label {
+            display: block; font-size: 10px; font-weight: 600;
+            text-transform: uppercase; letter-spacing: 0.1em;
+            color: var(--muted); margin-bottom: 8px;
+        }
+        
+        /* Mode Selector */
+        .mode-grid {
+            display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px;
+        }
+        
+        .mode-btn {
+            padding: 8px 4px; background: var(--bg); border: 1px solid var(--border);
+            border-radius: 4px; color: var(--muted); font-size: 9px;
+            font-weight: 600; text-transform: uppercase; cursor: pointer;
+            transition: all 0.2s ease; text-align: center;
+        }
+        
+        .mode-btn:hover { background: var(--hover); color: var(--fg); }
+        .mode-btn.active { background: var(--accent); color: #000; border-color: var(--accent); }
+        
+        /* Sliders */
+        .slider-header { display: flex; justify-content: space-between; margin-bottom: 4px; }
+        .slider-value { font-size: 12px; color: var(--accent); font-family: 'JetBrains Mono', monospace; }
+        
+        input[type="range"] {
+            width: 100%; height: 4px; background: var(--bg); border-radius: 2px;
+            outline: none; -webkit-appearance: none;
+        }
+        
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none; width: 14px; height: 14px;
+            background: var(--accent); border-radius: 50%; cursor: pointer;
+            transition: transform 0.2s;
+        }
+        input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+        
+        /* Buttons */
+        .action-btn {
+            width: 100%; padding: 12px; border: none; border-radius: 6px;
+            font-family: 'Space Grotesk', sans-serif; font-size: 13px;
+            font-weight: 600; cursor: pointer; transition: all 0.2s ease;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+        }
+        
+        .btn-primary { background: var(--accent); color: #000; }
+        .btn-primary:hover { background: var(--accent-dim); }
+        
+        .btn-secondary { background: var(--bg); color: var(--fg); border: 1px solid var(--border); }
+        .btn-secondary:hover { background: var(--hover); }
+        
+        /* Stats */
+        .stats-grid {
+            display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+            margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border);
+        }
+        .stat-item { text-align: center; padding: 8px; background: var(--bg); border-radius: 4px; }
+        .stat-value { font-size: 14px; font-weight: 700; color: var(--fg); }
+        .stat-label { font-size: 9px; text-transform: uppercase; color: var(--muted); margin-top: 2px; }
+
+        /* Animations */
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-fade-in { animation: fadeIn 0.5s ease forwards; }
+        
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .main-layout { flex-direction: column; }
+            .controls-col { order: 2; width: 100%; }
+        }
+    </style>
 </head>
-
 <body>
+    <div class="bg-pattern"></div>
+    
+    <main class="relative z-10 min-h-screen p-4 md:p-8">
+        <header class="max-w-6xl mx-auto mb-8 animate-fade-in">
+            <div class="flex items-center gap-3 mb-1">
+                <svg width="28" height="28" viewBox="0 0 32 32" fill="none" class="text-[var(--accent)]">
+                    <path d="M16 2v28M2 16h28M5.5 5.5l21 21M26.5 5.5l-21 21" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                    <circle cx="16" cy="16" r="2" fill="currentColor"/>
+                </svg>
+                <h1 class="text-xl md:text-2xl font-bold tracking-tight">Snowflake Pattern Engine</h1>
+            </div>
+            <p class="text-[var(--muted)] text-xs">Algorithmic ornamental generation with 8-fold symmetry</p>
+        </header>
+        
+        <div class="max-w-6xl mx-auto flex flex-col lg:flex-row gap-6 items-start main-layout">
+            <!-- Canvas -->
+            <div class="flex-1 flex justify-center animate-fade-in" style="animation-delay: 0.1s">
+                <div class="canvas-wrapper">
+                    <canvas id="snowflakeCanvas" width="512" height="512"></canvas>
+                </div>
+            </div>
+            
+            <!-- Controls -->
+            <div class="w-full lg:w-80 space-y-4 controls-col animate-fade-in" style="animation-delay: 0.2s">
+                
+                <!-- Pattern Mode -->
+                <div class="control-panel">
+                    <div class="control-group">
+                        <label class="control-label">Pattern Mode</label>
+                        <div class="mode-grid">
+                            <button class="mode-btn active" data-mode="chaos">Chaos</button>
+                            <button class="mode-btn" data-mode="lines">Lines</button>
+                            <button class="mode-btn" data-mode="cross">Cross</button>
+                            <button class="mode-btn" data-mode="crystal">Crystal</button>
+                            <button class="mode-btn" data-mode="flow">Flow</button>
+                        </div>
+                    </div>
+                </div>
 
-  <div class="container">
-    <h1>QR Tool</h1>
+                <!-- Parameters -->
+                <div class="control-panel">
+                    <div class="control-group">
+                        <div class="slider-header">
+                            <label class="control-label" style="margin-bottom:0">Density</label>
+                            <span class="slider-value" id="densityVal">50%</span>
+                        </div>
+                        <input type="range" id="density" min="0" max="100" value="50">
+                    </div>
+                    
+                    <div class="control-group">
+                        <div class="slider-header">
+                            <label class="control-label" style="margin-bottom:0">Structure</label>
+                            <span class="slider-value" id="structureVal">70%</span>
+                        </div>
+                        <input type="range" id="structure" min="0" max="100" value="70">
+                    </div>
 
-    <!-- Поле для ввода текста -->
-    <input type="text" id="textInput" placeholder="Введите текст или URL">
+                    <div class="control-group">
+                        <div class="slider-header">
+                            <label class="control-label" style="margin-bottom:0">Thickness</label>
+                            <span class="slider-value" id="thicknessVal">2px</span>
+                        </div>
+                        <input type="range" id="thickness" min="1" max="5" value="2">
+                    </div>
+                    
+                    <div class="control-group">
+                        <div class="slider-header">
+                            <label class="control-label" style="margin-bottom:0">Grid Size</label>
+                            <span class="slider-value" id="gridSizeVal">21</span>
+                        </div>
+                        <input type="range" id="gridSize" min="21" max="145" step="4" value="21">
+                    </div>
+                </div>
 
-    <!-- Кнопки -->
-    <div class="buttons">
-      <button id="generateBtn">Создать QR</button>
-      <button id="scanBtn">Сканировать QR</button>
-    </div>
+                <!-- Actions -->
+                <div class="control-panel">
+                    <div class="flex gap-2 mb-3">
+                        <button class="action-btn btn-primary" id="regenerateBtn" style="flex:2">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                            Generate
+                        </button>
+                        <button class="action-btn btn-secondary" id="saveBtn" style="flex:1">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+                        </button>
+                    </div>
+                    
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <div class="stat-value mono" id="totalCells">441</div>
+                            <div class="stat-label">Total</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value mono" id="blackRatio">50%</div>
+                            <div class="stat-label">Filled</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value mono" id="octantCells">28</div>
+                            <div class="stat-label">Octant</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+    
+    <script>
+        // === CONFIGURATION ===
+        const canvas = document.getElementById('snowflakeCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        const state = {
+            gridSize: 21,
+            density: 0.5,
+            structure: 0.7,
+            thickness: 2,
+            mode: 'chaos',
+            grid: []
+        };
 
-    <!-- Место, куда выводится сгенерированный QR-код -->
-    <div id="qrResult"></div>
+        // === PATTERN ENGINE ===
+        const PatternEngine = {
+            
+            // 1. CHAOS
+            chaos(x, y, params) {
+                return Math.random() < params.density ? 1 : 0;
+            },
 
-    <!-- Место, куда будет выводиться результат сканирования -->
-    <div id="scanResult"></div>
-  </div>
+            // 2. LINES (Embroidery)
+            lines(x, y, params) {
+                const step = 6; // Rhythm step
+                const thick = params.thickness;
+                const noise = Math.random() * 0.4; // Slight randomness
+                
+                // Create rhythmic lines
+                if ((x + y) % step < thick + noise) {
+                    return 1;
+                }
+                return Math.random() < (params.density * 0.2) ? 1 : 0; // Background noise
+            },
 
-  <!-- === Блок для сканера (пока скрыт) === -->
-  <div id="scannerOverlay" class="scanner-overlay" style="display: none;">
-    <div class="scanner-container">
-      <h2>Наведите камеру на QR-код</h2>
-      
-      <!-- Видео с камеры -->
-      <video id="video" autoplay playsinline></video>
-      
-      <!-- Рамка наведения (визуальная подсказка) -->
-      <div class="scan-frame"></div>
-      
-      <!-- Кнопка закрытия -->
-      <button id="closeScanner">Закрыть</button>
-      
-      <!-- Сообщение об ошибке или статусе -->
-      <div id="scanMessage"></div>
-    </div>
-  </div>
+            // 3. CROSS (Symbol)
+            cross(x, y, params) {
+                const thick = params.thickness;
+                // Strong axes
+                if (Math.abs(x) < thick || Math.abs(y) < thick) {
+                    return 1;
+                }
+                // Weaker diagonals
+                if (Math.abs(x - y) < thick) {
+                    return Math.random() < 0.7 ? 1 : 0;
+                }
+                // Background noise
+                return Math.random() < (params.density * 0.2) ? 1 : 0;
+            },
 
-  <!-- Подключаем наш JavaScript -->
-  <script src="js/core.js"></script>
+            // 4. CRYSTAL
+            crystal(x, y, params) {
+                const dist = Math.sqrt(x*x + y*y);
+                const freq = 0.4 + (params.density); // Frequency based on density
+                const thick = params.thickness * 0.2;
+                
+                // Sin waves create rings
+                if (Math.abs(Math.sin(dist * freq)) > (0.8 - thick)) {
+                    return 1;
+                }
+                return 0;
+            },
 
+            // 5. FLOW
+            flow(x, y, params) {
+                const scale = 0.1 + (params.thickness * 0.05);
+                const noise = Math.sin(x * scale) + Math.cos(y * scale * 1.5);
+                const threshold = 0.0 + (params.density * 1.5);
+                
+                if (noise > threshold) {
+                    return 1;
+                }
+                return 0;
+            }
+        };
+
+        // === HELPER FUNCTIONS ===
+        
+        // Mix pattern result with random noise based on Structure
+        function mixWithRandom(patternValue, params) {
+            const s = params.structure;
+            const r = Math.random() < params.density ? 1 : 0;
+            
+            // Weighted mix
+            if (patternValue === 1) {
+                return (Math.random() < s || r === 1) ? 1 : 0;
+            } else {
+                return (Math.random() < (1 - s) && r === 1) ? 1 : 0;
+            }
+        }
+
+        // Clean isolated pixels (dirt)
+        function cleanNoise(grid) {
+            const n = grid.length;
+            const tempGrid = grid.map(row => [...row]);
+            
+            for(let i=0; i<n; i++) {
+                for(let j=0; j<n; j++) {
+                    if (grid[i][j] === 1) {
+                        let neighbors = 0;
+                        // Check 8 neighbors
+                        for(let di=-1; di<=1; di++) {
+                            for(let dj=-1; dj<=1; dj++) {
+                                if(di===0 && dj===0) continue;
+                                const ni = i + di;
+                                const nj = j + dj;
+                                if (ni>=0 && ni<n && nj>=0 && nj<n && grid[ni][nj]===1) {
+                                    neighbors++;
+                                }
+                            }
+                        }
+                        // Remove if isolated
+                        if (neighbors < 1) {
+                            tempGrid[i][j] = 0;
+                        }
+                    }
+                }
+            }
+            return tempGrid;
+        }
+
+        // === MAIN GENERATION ===
+        
+        function generateGrid() {
+            const n = state.gridSize;
+            const center = Math.floor(n / 2);
+            const params = {
+                density: state.density,
+                structure: state.structure,
+                thickness: state.thickness
+            };
+
+            // Initialize grid
+            state.grid = Array(n).fill(null).map(() => Array(n).fill(0));
+
+            // Select pattern function
+            const patternFn = PatternEngine[state.mode] || PatternEngine.chaos;
+
+            // Generate Octant
+            for (let i = 0; i < n; i++) {
+                for (let j = 0; j < n; j++) {
+                    const dx = i - center;
+                    const dy = center - j;
+
+                    // Octant Logic: x >= 0, y >= 0, y <= x
+                    if (dx >= 0 && dy >= 0 && dy <= dx) {
+                        // Get pattern value
+                        let val = patternFn(dx, dy, params);
+                        
+                        // Mix with randomness
+                        val = mixWithRandom(val, params);
+                        
+                        // Apply symmetry
+                        setSymmetricValue(dx, dy, val);
+                    }
+                }
+            }
+
+            // Post-processing: Clean single pixels
+            state.grid = cleanNoise(state.grid);
+            updateStats();
+        }
+
+        function setSymmetricValue(dx, dy, value) {
+            const n = state.gridSize;
+            const center = Math.floor(n / 2);
+            
+            const positions = [
+                [dx, dy], [-dx, dy], [dx, -dy], [-dx, -dy],
+                [dy, dx], [-dy, dx], [dy, -dx], [-dy, -dx]
+            ];
+            
+            positions.forEach(([px, py]) => {
+                const gridX = center + px;
+                const gridY = center - py;
+                
+                if (gridX >= 0 && gridX < n && gridY >= 0 && gridY < n) {
+                    state.grid[gridY][gridX] = value;
+                }
+            });
+        }
+
+        function render() {
+            const n = state.gridSize;
+            const canvasSize = 512;
+            const size = canvasSize / n;
+            
+            canvas.width = canvasSize;
+            canvas.height = canvasSize;
+            
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(0, 0, canvasSize, canvasSize);
+            
+            ctx.fillStyle = '#000000';
+            
+            for (let i = 0; i < n; i++) {
+                for (let j = 0; j < n; j++) {
+                    if (state.grid[j][i] === 1) {
+                        ctx.fillRect(i * size, j * size, size, size);
+                    }
+                }
+            }
+        }
+
+        function updateStats() {
+            const n = state.gridSize;
+            const total = n * n;
+            let count = 0;
+            let octant = 0;
+            const center = Math.floor(n/2);
+            
+            for(let i=0; i<n; i++) {
+                for(let j=0; j<n; j++) {
+                    if(state.grid[j][i] === 1) count++;
+                    
+                    const dx = i - center;
+                    const dy = center - j;
+                    if (dx >= 0 && dy >= 0 && dy <= dx) octant++;
+                }
+            }
+            
+            document.getElementById('totalCells').textContent = total;
+            document.getElementById('blackRatio').textContent = Math.round((count/total)*100) + '%';
+            document.getElementById('octantCells').textContent = octant;
+        }
+
+        // === EVENT LISTENERS ===
+
+        // Mode Buttons
+        document.querySelectorAll('.mode-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+                e.target.classList.add('active');
+                state.mode = e.target.dataset.mode;
+                generateGrid();
+                render();
+            });
+        });
+
+        // Sliders
+        const sliders = ['density', 'structure', 'thickness', 'gridSize'];
+        sliders.forEach(id => {
+            const el = document.getElementById(id);
+            const valEl = document.getElementById(id + 'Val');
+            
+            el.addEventListener('input', (e) => {
+                let val = parseInt(e.target.value);
+                
+                if(id === 'density' || id === 'structure') {
+                    val = val / 100; // Convert to 0-1
+                    valEl.textContent = (val * 100) + '%';
+                } else if (id === 'thickness') {
+                    valEl.textContent = val + 'px';
+                } else {
+                    valEl.textContent = val;
+                }
+                
+                state[id] = val;
+                generateGrid();
+                render();
+            });
+        });
+
+        // Buttons
+        document.getElementById('regenerateBtn').addEventListener('click', () => {
+            generateGrid();
+            render();
+        });
+
+        document.getElementById('saveBtn').addEventListener('click', () => {
+            const link = document.createElement('a');
+            link.download = `snowflake-${state.mode}-${state.gridSize}.png`;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        });
+
+        // Init
+        generateGrid();
+        render();
+
+    </script>
 </body>
 </html>
