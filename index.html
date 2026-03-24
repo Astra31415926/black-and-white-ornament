@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pattern Snowflake Generator</title>
+    <title>Advanced Snowflake Pattern Engine</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Space+Grotesk:wght@300;500;700&display=swap" rel="stylesheet">
     <style>
@@ -66,20 +66,20 @@
             color: var(--muted); margin-bottom: 8px;
         }
         
-        /* Mode Selector */
-        .mode-grid {
+        /* Mode & Bias Chips */
+        .chip-grid {
             display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px;
         }
         
-        .mode-btn {
+        .chip-btn {
             padding: 8px 4px; background: var(--bg); border: 1px solid var(--border);
             border-radius: 4px; color: var(--muted); font-size: 9px;
             font-weight: 600; text-transform: uppercase; cursor: pointer;
             transition: all 0.2s ease; text-align: center;
         }
         
-        .mode-btn:hover { background: var(--hover); color: var(--fg); }
-        .mode-btn.active { background: var(--accent); color: #000; border-color: var(--accent); }
+        .chip-btn:hover { background: var(--hover); color: var(--fg); }
+        .chip-btn.active { background: var(--accent); color: #000; border-color: var(--accent); }
         
         /* Sliders */
         .slider-header { display: flex; justify-content: space-between; margin-bottom: 4px; }
@@ -161,12 +161,24 @@
                 <div class="control-panel">
                     <div class="control-group">
                         <label class="control-label">Pattern Mode</label>
-                        <div class="mode-grid">
-                            <button class="mode-btn active" data-mode="chaos">Chaos</button>
-                            <button class="mode-btn" data-mode="lines">Lines</button>
-                            <button class="mode-btn" data-mode="cross">Cross</button>
-                            <button class="mode-btn" data-mode="crystal">Crystal</button>
-                            <button class="mode-btn" data-mode="flow">Flow</button>
+                        <div class="chip-grid">
+                            <button class="chip-btn active" data-mode="chaos">Chaos</button>
+                            <button class="chip-btn" data-mode="lines">Lines</button>
+                            <button class="chip-btn" data-mode="crystal">Crystal</button>
+                            <button class="chip-btn" data-mode="flow">Flow</button>
+                            <button class="chip-btn" data-mode="embroidery">Embroid</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Bias Control -->
+                    <div class="control-group mt-3">
+                        <label class="control-label">Bias (Structure Focus)</label>
+                        <div class="chip-grid">
+                            <button class="chip-btn active" data-bias="none">None</button>
+                            <button class="chip-btn" data-bias="center">Center</button>
+                            <button class="chip-btn" data-bias="axis">Axes</button>
+                            <button class="chip-btn" data-bias="diag">Diagonals</button>
+                            <button class="chip-btn" data-bias="edge">Edges</button>
                         </div>
                     </div>
                 </div>
@@ -248,6 +260,7 @@
             structure: 0.7,
             thickness: 2,
             mode: 'chaos',
+            bias: 'none',
             grid: []
         };
 
@@ -255,76 +268,115 @@
         const PatternEngine = {
             
             // 1. CHAOS
-            chaos(x, y, params) {
-                return Math.random() < params.density ? 1 : 0;
+            chaos(x, y, params, biasMod) {
+                return Math.random() < (params.density * biasMod) ? 1 : 0;
             },
 
             // 2. LINES (Embroidery)
-            lines(x, y, params) {
-                const step = 6; // Rhythm step
+            lines(x, y, params, biasMod) {
+                const step = 6;
                 const thick = params.thickness;
-                const noise = Math.random() * 0.4; // Slight randomness
+                const noise = Math.random() * 0.4;
                 
-                // Create rhythmic lines
-                if ((x + y) % step < thick + noise) {
-                    return 1;
-                }
-                return Math.random() < (params.density * 0.2) ? 1 : 0; // Background noise
+                if ((x + y) % step < thick + noise) return 1;
+                return Math.random() < (params.density * 0.1 * biasMod) ? 1 : 0;
             },
 
-            // 3. CROSS (Symbol)
-            cross(x, y, params) {
-                const thick = params.thickness;
-                // Strong axes
-                if (Math.abs(x) < thick || Math.abs(y) < thick) {
-                    return 1;
-                }
-                // Weaker diagonals
-                if (Math.abs(x - y) < thick) {
-                    return Math.random() < 0.7 ? 1 : 0;
-                }
-                // Background noise
-                return Math.random() < (params.density * 0.2) ? 1 : 0;
-            },
-
-            // 4. CRYSTAL
-            crystal(x, y, params) {
+            // 3. CRYSTAL
+            crystal(x, y, params, biasMod) {
                 const dist = Math.sqrt(x*x + y*y);
-                const freq = 0.4 + (params.density); // Frequency based on density
-                const thick = params.thickness * 0.2;
+                const freq = 0.3 + (params.density * 0.5);
+                const thick = params.thickness * 0.25;
                 
-                // Sin waves create rings
-                if (Math.abs(Math.sin(dist * freq)) > (0.8 - thick)) {
-                    return 1;
-                }
+                if (Math.abs(Math.sin(dist * freq)) > (0.85 - thick)) return 1;
                 return 0;
             },
 
-            // 5. FLOW
-            flow(x, y, params) {
-                const scale = 0.1 + (params.thickness * 0.05);
+            // 4. FLOW
+            flow(x, y, params, biasMod) {
+                const scale = 0.08 + (params.thickness * 0.04);
                 const noise = Math.sin(x * scale) + Math.cos(y * scale * 1.5);
-                const threshold = 0.0 + (params.density * 1.5);
+                const threshold = 0.5 - (params.density * 1.2);
+                return noise > threshold ? 1 : 0;
+            },
+
+            // 5. EMBROIDERY (New Logic)
+            // Uses small shapes placed in the octant
+            embroidery(x, y, params, biasMod) {
+                // Use a grid step to place shapes
+                const step = 4; 
+                const localX = x % step;
+                const localY = y % step;
                 
-                if (noise > threshold) {
-                    return 1;
+                // Only generate if at a "grid anchor" or if we want random placement
+                // Here we use a probability to place a shape center
+                // But since we iterate pixel-by-pixel in the main loop, we need state or deterministic noise.
+                
+                // Alternative: Per-pixel procedural shapes
+                // Let's try a mix of predefined patterns based on position
+                
+                const patternId = Math.floor((x/step) + (y/step) * 1000) % 4; // Pseudo pattern selector
+                const fillChance = params.density * biasMod;
+
+                if (Math.random() > fillChance) return 0; // Apply density
+
+                // Simple shapes relative to a conceptual block
+                // Shape 0: Plus/Cross (center dot)
+                if (patternId === 0) {
+                    if (localX === Math.floor(step/2) && localY === Math.floor(step/2)) return 1;
                 }
+                // Shape 1: Diagonal Line
+                if (patternId === 1) {
+                    if (localX === localY) return 1;
+                }
+                // Shape 2: Diamond approximation
+                if (patternId === 2) {
+                     if (Math.abs(localX - step/2) + Math.abs(localY - step/2) <= params.thickness) return 1;
+                }
+                // Shape 3: Angle
+                if (patternId === 3) {
+                    if (localX === 0 || localY === 0) return 1;
+                }
+
                 return 0;
             }
         };
 
-        // === HELPER FUNCTIONS ===
-        
-        // Mix pattern result with random noise based on Structure
+        // === HELPER: BIAS CALCULATOR ===
+        function calculateBias(dx, dy, maxDist) {
+            if (state.bias === 'none') return 1.0;
+            
+            const dist = Math.sqrt(dx*dx + dy*dy);
+            const normDist = maxDist > 0 ? dist / maxDist : 0;
+
+            if (state.bias === 'center') {
+                return 1.0 - (normDist * 0.8); // Higher prob in center
+            }
+            if (state.bias === 'edge') {
+                return 0.2 + (normDist * 0.8); // Higher prob at edges
+            }
+            if (state.bias === 'axis') {
+                // dx=0 or dy=0 is axis. 
+                const nearAxis = (dx < 2 || dy < 2) ? 1.5 : 1.0;
+                return nearAxis;
+            }
+            if (state.bias === 'diag') {
+                // dx=dy is diagonal
+                const nearDiag = (Math.abs(dx - dy) < 2) ? 1.5 : 1.0;
+                return nearDiag;
+            }
+            return 1.0;
+        }
+
+        // === HELPER: MIX WITH STRUCTURE ===
         function mixWithRandom(patternValue, params) {
             const s = params.structure;
             const r = Math.random() < params.density ? 1 : 0;
             
-            // Weighted mix
             if (patternValue === 1) {
-                return (Math.random() < s || r === 1) ? 1 : 0;
+                return (Math.random() < s) ? 1 : 0; // Keep pattern based on structure
             } else {
-                return (Math.random() < (1 - s) && r === 1) ? 1 : 0;
+                return (Math.random() > s && r === 1) ? 1 : 0; // Add noise based on (1-s)
             }
         }
 
@@ -337,7 +389,6 @@
                 for(let j=0; j<n; j++) {
                     if (grid[i][j] === 1) {
                         let neighbors = 0;
-                        // Check 8 neighbors
                         for(let di=-1; di<=1; di++) {
                             for(let dj=-1; dj<=1; dj++) {
                                 if(di===0 && dj===0) continue;
@@ -348,10 +399,7 @@
                                 }
                             }
                         }
-                        // Remove if isolated
-                        if (neighbors < 1) {
-                            tempGrid[i][j] = 0;
-                        }
+                        if (neighbors < 1) tempGrid[i][j] = 0;
                     }
                 }
             }
@@ -363,16 +411,14 @@
         function generateGrid() {
             const n = state.gridSize;
             const center = Math.floor(n / 2);
+            const maxDist = center;
             const params = {
                 density: state.density,
                 structure: state.structure,
                 thickness: state.thickness
             };
 
-            // Initialize grid
             state.grid = Array(n).fill(null).map(() => Array(n).fill(0));
-
-            // Select pattern function
             const patternFn = PatternEngine[state.mode] || PatternEngine.chaos;
 
             // Generate Octant
@@ -383,19 +429,31 @@
 
                     // Octant Logic: x >= 0, y >= 0, y <= x
                     if (dx >= 0 && dy >= 0 && dy <= dx) {
-                        // Get pattern value
-                        let val = patternFn(dx, dy, params);
                         
-                        // Mix with randomness
+                        // Calculate Bias Modifier
+                        const biasMod = calculateBias(dx, dy, maxDist);
+                        
+                        // Get pattern value (1 or 0)
+                        let val = patternFn(dx, dy, params, biasMod);
+                        
+                        // Mix with randomness (Structure parameter)
                         val = mixWithRandom(val, params);
                         
-                        // Apply symmetry
-                        setSymmetricValue(dx, dy, val);
+                        // Apply bias probability boost
+                        // If bias is strong, we boost probability of 1 directly or via patternFn
+                        // Here we apply a final chance multiplier for the bias
+                        if (val === 0 && biasMod > 1.0 && Math.random() < (biasMod - 1.0) * params.density) {
+                            val = 1;
+                        }
+                        
+                        if (val === 1) {
+                            setSymmetricValue(dx, dy, 1);
+                        }
                     }
                 }
             }
 
-            // Post-processing: Clean single pixels
+            // Post-processing
             state.grid = cleanNoise(state.grid);
             updateStats();
         }
@@ -466,11 +524,22 @@
         // === EVENT LISTENERS ===
 
         // Mode Buttons
-        document.querySelectorAll('.mode-btn').forEach(btn => {
+        document.querySelectorAll('.chip-btn[data-mode]').forEach(btn => {
             btn.addEventListener('click', (e) => {
-                document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.chip-btn[data-mode]').forEach(b => b.classList.remove('active'));
                 e.target.classList.add('active');
                 state.mode = e.target.dataset.mode;
+                generateGrid();
+                render();
+            });
+        });
+
+        // Bias Buttons
+        document.querySelectorAll('.chip-btn[data-bias]').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                document.querySelectorAll('.chip-btn[data-bias]').forEach(b => b.classList.remove('active'));
+                e.target.classList.add('active');
+                state.bias = e.target.dataset.bias;
                 generateGrid();
                 render();
             });
@@ -486,7 +555,7 @@
                 let val = parseInt(e.target.value);
                 
                 if(id === 'density' || id === 'structure') {
-                    val = val / 100; // Convert to 0-1
+                    val = val / 100;
                     valEl.textContent = (val * 100) + '%';
                 } else if (id === 'thickness') {
                     valEl.textContent = val + 'px';
